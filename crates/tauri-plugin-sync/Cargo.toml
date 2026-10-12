@@ -1,0 +1,36 @@
+[package]
+name = "tauri-plugin-sync"
+version = "0.1.0"
+links = "tauri-plugin-sync"
+authors = ["Karan Gupta <founder@guptaventures.com>", "Gupta Ventures"]
+description = "Zero-Configuration Local-First SQLite Replication & Sync Engine for Tauri v2"
+edition = "2021"
+rust-version = "1.77.2"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/gupta-ventures/tauri-plugin-sync"
+readme = "../../README.md"
+keywords = ["tauri", "plugin", "sqlite", "sync", "offline-first"]
+categories = ["gui", "database"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[dependencies]
+tauri = { version = "2.0", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tokio = { version = "1.38", features = ["sync", "time", "rt", "macros"] }
+rusqlite = { version = "0.32", features = ["bundled", "backup", "blob"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+uuid = { version = "1.8", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+log = "0.4"
+
+[build-dependencies]
+tauri-plugin = { version = "2.0", features = ["build"] }
+
+[dev-dependencies]
+tauri = { version = "2.0", features = ["test"] }
+tempfile = "3.10"
+wiremock = "0.6"

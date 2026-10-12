@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Offline-First Sync Todo Demo</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --subtext: #94a3b8;
+      --accent: #3b82f6;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 24px; display: flex; justify-content: center; }
+    .container { width: 100%; max-width: 600px; }
+    header { margin-bottom: 24px; }
+    h1 { font-size: 24px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .subtitle { color: var(--subtext); font-size: 14px; margin-top: 4px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 20px; }
+    .sync-bar { display: flex; justify-content: space-between; align-items: center; }
+    .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9999px; font-size: 13px; font-weight: 600; text-transform: uppercase; }
+    .status-idle { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+    .status-syncing { background: rgba(59, 130, 246, 0.2); color: var(--accent); }
+    .status-offline { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+    .status-error { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+    .controls { display: flex; gap: 8px; }
+    button { background: var(--accent); color: white; border: none; border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; font-size: 13px; }
+    button:hover { opacity: 0.9; }
+    button.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    button.btn-offline { background: var(--warning); color: #000; }
+    .input-group { display: flex; gap: 8px; margin-bottom: 16px; }
+    input[type="text"] { flex: 1; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 14px; outline: none; }
+    input[type="text"]:focus { border-color: var(--accent); }
+    ul { list-style: none; }
+    li { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
+    .todo-content { display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; }
+    .completed { text-decoration: line-through; color: var(--subtext); }
+    .delete-btn { background: transparent; color: var(--danger); border: none; font-size: 16px; cursor: pointer; padding: 4px 8px; }
+    .stat-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--subtext); margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>⚡ Tauri Plugin Sync</h1>
+      <div class="subtitle">Zero-Configuration Local-First SQLite Replication Demo</div>
+    </header>
+
+    <div class="card">
+      <div class="sync-bar">
+        <div>
+          <span style="font-size: 13px; color: var(--subtext);">Status:</span>
+          <span id="status-badge" class="status-badge status-idle">IDLE</span>
+        </div>
+        <div class="controls">
+          <button id="toggle-offline-btn" class="btn-outline">🌐 Go Offline (Simulate)</button>
+          <button id="sync-now-btn">🔄 Sync Now</button>
+        </div>
+      </div>
+      <div class="stat-row">
+        <span>Pending Changes: <strong id="pending-count">0</strong></span>
+        <span>Last Sync: <strong id="last-sync">Never</strong></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="input-group">
+        <input type="text" id="todo-input" placeholder="Enter task (e.g., 'Verify SQLite CDC triggers')..." />
+        <button id="add-todo-btn">Add Task</button>
+      </div>
+
+      <ul id="todo-list"></ul>
+    </div>
+  </div>
+
+  <script type="module">
+    // Mock or direct IPC invocation helper
+    const invoke = window.__TAURI__ ? window.__TAURI__.core.invoke : async () => {};
+    const listen = window.__TAURI__ ? window.__TAURI__.event.listen : async () => {};
+
+    let isOffline = false;
+    let pendingChangesCount = 0;
+
+    const statusBadge = document.getElementById('status-badge');
+    const toggleOfflineBtn = document.getElementById('toggle-offline-btn');
+    const syncNowBtn = document.getElementById('sync-now-btn');
+    const todoInput = document.getElementById('todo-input');
+    const addTodoBtn = document.getElementById('add-todo-btn');
+    const todoList = document.getElementById('todo-list');
+    const pendingCountSpan = document.getElementById('pending-count');
+    const lastSyncSpan = document.getElementById('last-sync');
+
+    function updateStatusUI(state) {
+      statusBadge.className = 'status-badge status-' + state.toLowerCase();
+      statusBadge.textContent = state.toUpperCase();
+    }
+
+    async function refreshTodos() {
+      try {
+        const todos = await invoke('get_todos');
+        todoList.innerHTML = '';
+        todos.forEach(t => {
+          const li = document.createElement('li');
+          li.innerHTML = `
+            <div class="todo-content ${t.completed ? 'completed' : ''}">
+              <input type="checkbox" ${t.completed ? 'checked' : ''} />
+              <span>${t.title}</span>
+            </div>
+            <button class="delete-btn">✕</button>
+          `;
+
+          li.querySelector('input').addEventListener('change', async (e) => {
+            await invoke('toggle_todo', { id: t.id, completed: e.target.checked });
+            await updatePendingCount();
+            await refreshTodos();
+          });
+
+          li.querySelector('.delete-btn').addEventListener('click', async () => {
+            await invoke('delete_todo', { id: t.id });
+            await updatePendingCount();
+            await refreshTodos();
+          });
+
+          todoList.appendChild(li);
+        });
+      } catch (e) {
+        console.error('Failed to load todos:', e);
+      }
+    }
+
+    async function updatePendingCount() {
+      try {
+        const status = await invoke('plugin:sync|get_status');
+        if (status) {
+          pendingChangesCount = status.pending_changes;
+          pendingCountSpan.textContent = pendingChangesCount;
+          if (status.last_sync_at) {
+            lastSyncSpan.textContent = new Date(status.last_sync_at).toLocaleTimeString();
+          }
+        }
+      } catch (e) {}
+    }
+
+    async function initPlugin() {
+      try {
+        const dbPath = await invoke('get_db_path');
+        // Initialize tauri-plugin-sync on the database
+        await invoke('plugin:sync|init', {
+          config: {
+            database: dbPath,
+            endpoint: 'https://sync.example.com/api',
+            tables: ['todos'],
+            auth_header: 'Bearer demo-token-123',
+            sync_interval_ms: 10000,
+            batch_size: 50,
+            prune_days: 30
+          }
+        });
+
+        // Listen for live status events
+        await listen('sync://status', (event) => {
+          if (!isOffline) {
+            updateStatusUI(event.payload.state);
+            pendingCountSpan.textContent = event.payload.pending_changes;
+            if (event.payload.last_sync_at) {
+              lastSyncSpan.textContent = new Date(event.payload.last_sync_at).toLocaleTimeString();
+            }
+          }
+        });
+      } catch (e) {
+        console.warn('Sync plugin init:', e);
+      }
+    }
+
+    toggleOfflineBtn.addEventListener('click', () => {
+      isOffline = !isOffline;
+      if (isOffline) {
+        toggleOfflineBtn.textContent = '⚡ Go Online';
+        toggleOfflineBtn.className = 'btn-offline';
+        updateStatusUI('offline');
+      } else {
+        toggleOfflineBtn.textContent = '🌐 Go Offline (Simulate)';
+        toggleOfflineBtn.className = 'btn-outline';
+        updateStatusUI('idle');
+        triggerSync();
+      }
+    });
+
+    async function triggerSync() {
+      if (isOffline) {
+        alert('Currently in Offline Simulation mode. Switch to Online to sync.');
+        return;
+      }
+      updateStatusUI('syncing');
+      try {
+        const progress = await invoke('plugin:sync|sync_now');
+        lastSyncSpan.textContent = new Date().toLocaleTimeString();
+        await updatePendingCount();
+        updateStatusUI('idle');
+      } catch (e) {
+        updateStatusUI('offline');
+      }
+    }
+
+    syncNowBtn.addEventListener('click', triggerSync);
+
+    addTodoBtn.addEventListener('click', async () => {
+      const title = todoInput.value.trim();
+      if (!title) return;
+      const id = 'todo-' + Date.now();
+      await invoke('add_todo', { id, title });
+      todoInput.value = '';
+      await updatePendingCount();
+      await refreshTodos();
+    });
+
+    todoInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') addTodoBtn.click();
+    });
+
+    // Boot
+    await initPlugin();
+    await refreshTodos();
+    await updatePendingCount();
+  </script>
+</body>
+</html>

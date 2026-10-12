@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/schema.json",
+  "productName": "TodoSyncApp",
+  "version": "0.1.0",
+  "identifier": "com.guptaventures.todosync",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Offline-First Sync Todo Demo",
+        "width": 800,
+        "height": 650
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  }
+}

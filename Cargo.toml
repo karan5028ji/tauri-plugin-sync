@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "crates/tauri-plugin-sync",
+    "examples/todo/src-tauri",
+]
+resolver = "2"

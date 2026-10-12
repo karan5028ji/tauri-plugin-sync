@@ -1,0 +1,33 @@
+{
+  "$schema": "../schemas/schema.json",
+  "permissions": [
+    {
+      "identifier": "allow-init",
+      "description": "Enables the init command without pre-configured scope.",
+      "commands": {
+        "allow": ["init"]
+      }
+    },
+    {
+      "identifier": "allow-sync-now",
+      "description": "Enables the sync_now command without pre-configured scope.",
+      "commands": {
+        "allow": ["sync_now"]
+      }
+    },
+    {
+      "identifier": "allow-get-status",
+      "description": "Enables the get_status command without pre-configured scope.",
+      "commands": {
+        "allow": ["get_status"]
+      }
+    },
+    {
+      "identifier": "allow-configure",
+      "description": "Enables the configure command without pre-configured scope.",
+      "commands": {
+        "allow": ["configure"]
+      }
+    }
+  ]
+}

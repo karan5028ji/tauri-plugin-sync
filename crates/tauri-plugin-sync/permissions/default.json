@@ -1,0 +1,13 @@
+{
+  "$schema": "../schemas/schema.json",
+  "default": {
+    "description": "Default permissions for tauri-plugin-sync",
+    "permissions": [
+      "allow-init",
+      "allow-sync-now",
+      "allow-get-status",
+      "allow-configure"
+    ]
+  },
+  "set": []
+}

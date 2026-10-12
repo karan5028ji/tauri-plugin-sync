@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>tauri-plugin-sync | The Zero-Latency Local-First Sync Engine for Tauri</title>
+  <meta name="description" content="Build offline-first desktop apps with SQLite CDC, automatic LWW conflict resolution, and zero infinite loops. No backend boilerplate required.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Geist"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            pitch: '#000000',
+            surface: {
+              950: '#06080d',
+              900: '#0b0f17',
+              850: '#111723',
+              800: '#182030',
+              700: '#26334d',
+            },
+            accent: {
+              amber: '#f59e0b',
+              tauri: '#fbb03b',
+              emerald: '#10b981',
+            }
+          },
+          boxShadow: {
+            'glow-subtle': '0 0 50px -10px rgba(245, 158, 11, 0.15)',
+            'glow-white': '0 0 25px -5px rgba(255, 255, 255, 0.12)',
+            'glass': '0 20px 40px -15px rgba(0, 0, 0, 0.7)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #000000;
+      color: #f1f5f9;
+      overflow-x: hidden;
+      letter-spacing: -0.015em;
+    }
+    
+    /* Subtle background grid with targeted center fade */
+    .hero-grid {
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+      background-size: 64px 64px;
+      mask-image: radial-gradient(ellipse at 50% 30%, rgba(0, 0, 0, 1) 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse at 50% 30%, rgba(0, 0, 0, 1) 30%, transparent 80%);
+    }
+
+    /* Glass card with ultra-thin 1px border */
+    .glass-panel {
+      background: rgba(10, 14, 22, 0.55);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+    }
+    .glass-panel:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    /* Vercel-style clean button */
+    .btn-vercel-primary {
+      background: #ffffff;
+      color: #000000;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+    .btn-vercel-primary:hover {
+      background: #e2e8f0;
+      box-shadow: 0 0 25px -4px rgba(255, 255, 255, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .btn-vercel-secondary {
+      background: rgba(15, 20, 30, 0.6);
+      backdrop-filter: blur(12px);
+      color: #f1f5f9;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      transition: all 0.2s ease;
+    }
+    .btn-vercel-secondary:hover {
+      background: rgba(24, 32, 48, 0.8);
+      border-color: rgba(255, 255, 255, 0.28);
+      color: #ffffff;
+      box-shadow: 0 0 20px -5px rgba(255, 255, 255, 0.15);
+      transform: translateY(-1px);
+    }
+  </style>
+</head>
+<body class="min-h-screen font-sans selection:bg-white selection:text-black">
+
+  <!-- Deep Atmospheric Background Radial Glows (Hero Orbs) -->
+  <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[1100px] h-[650px] bg-[radial-gradient(ellipse_at_center,_rgba(245,158,11,0.09)_0%,_rgba(255,107,53,0.04)_40%,_transparent_75%)] blur-3xl pointer-events-none -z-10"></div>
+  <div class="fixed top-36 left-1/2 -translate-x-1/2 w-[650px] h-[350px] bg-[radial-gradient(circle,_rgba(255,255,255,0.04)_0%,_transparent_70%)] blur-2xl pointer-events-none -z-10"></div>
+
+  <!-- Header / Navigation -->
+  <header class="sticky top-0 z-50 border-b border-white/[0.08] bg-black/60 backdrop-blur-2xl">
+    <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-amber-300 font-bold text-sm shadow-inner">
+          ⚡
+        </div>
+        <div class="flex items-center space-x-2.5">
+          <span class="font-bold text-sm tracking-tight text-white">tauri-plugin-sync</span>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/[0.06] text-slate-400 border border-white/10">v0.1.0</span>
+        </div>
+      </div>
+
+      <nav class="hidden md:flex items-center space-x-8 text-xs font-medium tracking-normal text-slate-400">
+        <a href="#features" class="hover:text-white transition duration-150">Features</a>
+        <a href="#demo" class="hover:text-white transition duration-150">Live Monitor</a>
+        <a href="#code" class="hover:text-white transition duration-150">Quickstart</a>
+        <a href="#roadmap" class="hover:text-white transition duration-150">Adapters Roadmap</a>
+      </nav>
+
+      <div class="flex items-center space-x-3">
+        <a href="https://github.com/karan5028ji/tauri-plugin-sync" target="_blank" class="btn-vercel-secondary px-3.5 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-2">
+          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path></svg>
+          <span>Star</span>
+        </a>
+        <a href="#roadmap" class="btn-vercel-primary px-3.5 py-1.5 rounded-lg text-xs font-semibold">
+          Early Access
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="relative pt-24 pb-28 overflow-hidden">
+    <!-- Grid overlay behind hero -->
+    <div class="absolute inset-0 hero-grid pointer-events-none -z-10"></div>
+
+    <div class="max-w-5xl mx-auto px-6 text-center">
+      
+      <!-- Linear-style Pill Badge -->
+      <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/10 text-xs font-medium text-slate-300 mb-8 backdrop-blur-md">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        <span class="text-slate-400 font-mono text-[11px]">Production-Ready for Tauri v2 & SQLite</span>
+      </div>
+
+      <!-- Main Headline: Tight tracking & sophisticated subtle metallic gradient -->
+      <h1 class="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-[-0.04em] text-white mb-6 leading-[1.06]">
+        The Zero-Latency Local-First<br />
+        <span class="text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-200 to-slate-400">
+          Sync Engine for Tauri.
+        </span>
+      </h1>
+
+      <!-- Subheadline -->
+      <p class="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed font-normal tracking-normal">
+        Build offline-first desktop apps with SQLite CDC, automatic LWW conflict resolution, and zero infinite loops. No backend boilerplate required.
+      </p>
+
+      <!-- Action Row: Frosted Glass Command Box + Vercel Buttons -->
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-lg mx-auto mb-16">
+        
+        <!-- Frosted Glass Command Box -->
+        <div class="w-full sm:w-auto flex-1 flex items-center justify-between px-4 py-2.5 rounded-xl bg-black/50 border border-white/10 font-mono text-xs text-slate-300 backdrop-blur-xl shadow-glass">
+          <div class="flex items-center space-x-2.5">
+            <span class="text-slate-500 font-medium">$</span>
+            <span class="text-slate-200 select-all font-mono">npm install tauri-plugin-sync</span>
+          </div>
+          <button id="copy-btn" onclick="navigator.clipboard.writeText('npm install tauri-plugin-sync'); const btn = this; btn.innerText='Copied!'; setTimeout(() => btn.innerText='Copy', 2000)" class="ml-3 px-2 py-1 text-[11px] font-medium rounded-md bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition">
+            Copy
+          </button>
+        </div>
+
+        <!-- View GitHub Button (Vercel Solid White) -->
+        <a href="https://github.com/karan5028ji/tauri-plugin-sync" target="_blank" class="w-full sm:w-auto btn-vercel-primary px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center space-x-2 shadow-sm">
+          <span>View GitHub</span>
+          <span class="text-slate-400">↗</span>
+        </a>
+      </div>
+
+      <!-- The Proof Centerpiece: Sleek macOS Split-Screen Live Replication Monitor -->
+      <div id="demo" class="max-w-4xl mx-auto rounded-2xl p-px bg-gradient-to-b from-white/20 via-white/5 to-transparent shadow-2xl">
+        <div class="rounded-[15px] bg-[#06080d]/90 backdrop-blur-2xl border border-white/10 overflow-hidden text-left">
+          
+          <!-- Sleek Apple/Linear style Window Chrome Header -->
+          <div class="px-4 py-3 bg-[#0a0d14]/90 border-b border-white/[0.08] flex items-center justify-between text-xs text-slate-400 font-mono">
+            <div class="flex items-center space-x-2">
+              <div class="w-2.5 h-2.5 rounded-full bg-[#ff5f56]/90"></div>
+              <div class="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]/90"></div>
+              <div class="w-2.5 h-2.5 rounded-full bg-[#27c93f]/90"></div>
+              <span class="ml-3 text-slate-300 font-medium text-[11px]">split-screen-replication-live-monitor.mp4</span>
+            </div>
+            <div class="flex items-center space-x-3 text-[11px]">
+              <span class="flex items-center space-x-1.5 text-emerald-400 font-medium">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>REC • LIVE LOOP</span>
+              </span>
+              <span class="px-2 py-0.5 rounded bg-white/[0.05] text-slate-400 border border-white/5">60 FPS</span>
+            </div>
+          </div>
+
+          <!-- Video Player Showcase: Split-Screen Replication (Linear/Vercel Aesthetic) -->
+          <div class="relative bg-black w-full overflow-hidden aspect-[16/9] flex items-center justify-center">
+            <video 
+              id="demo-video"
+              autoplay 
+              loop 
+              muted 
+              playsinline
+              preload="auto"
+              class="w-full h-full object-cover"
+            >
+              <source src="media/tauri-sync-demo.mp4" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+
+            <!-- Subtle bottom gradient shadow overlay for polish -->
+            <div class="absolute inset-0 pointer-events-none border border-white/[0.04]"></div>
+          </div>
+
+          <!-- Bottom Status Bar -->
+          <div class="px-6 py-3 bg-[#0a0d14] border-t border-white/[0.08] flex flex-wrap items-center justify-between text-xs font-mono text-slate-400">
+            <div class="flex items-center space-x-5">
+              <span>Latency: <strong class="text-emerald-400">0.4ms</strong></span>
+              <span>Memory: <strong class="text-slate-200">6.2 MB</strong></span>
+              <span>Loop Protection: <strong class="text-slate-200">_sync_suppress = 1</strong></span>
+            </div>
+            <div class="text-slate-500 text-[11px]">
+              No WebSockets needed • Standard HTTP REST Push/Pull
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 3. The 'Aha!' Features Grid (Bento Box Layout) -->
+  <section id="features" class="py-28 border-t border-white/[0.08] bg-pitch">
+    <div class="max-w-6xl mx-auto px-6">
+      
+      <div class="text-center mb-16">
+        <div class="text-xs font-mono font-medium uppercase tracking-widest text-slate-400 mb-2">High-Performance Architecture</div>
+        <h2 class="text-3xl sm:text-5xl font-extrabold text-white tracking-[-0.03em]">Engineered for 60fps Native Feel.</h2>
+        <p class="text-slate-400 text-sm sm:text-base max-w-lg mx-auto mt-3">Every write hits local disk instantly. Background Tokio threads handle cloud synchronization asynchronously without blocking your UI thread.</p>
+      </div>
+
+      <!-- Bento Grid (3-4 neat frosted cards) -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        <!-- Card 1: 0ms Local Writes -->
+        <div class="glass-panel p-8 rounded-2xl flex flex-col justify-between transition duration-200">
+          <div>
+            <div class="w-10 h-10 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-slate-200 text-lg mb-6">
+              ⚡
+            </div>
+            <div class="text-[10px] font-mono uppercase text-slate-400 font-semibold mb-2">P0 Requirement</div>
+            <h3 class="text-xl font-bold text-white mb-2.5 tracking-tight">0ms Local Writes</h3>
+            <p class="text-slate-400 text-sm leading-relaxed mb-6 font-normal">
+              Your app queries and mutates local SQLite directly. UI runs permanently at 60fps with zero network spinner latency, whether your user is on a flight or in an elevator.
+            </p>
+          </div>
+          <div class="p-3 rounded-xl bg-black/40 border border-white/5 font-mono text-xs text-slate-400">
+            <span class="text-emerald-400">bench:</span> query_latency = <span class="text-slate-200 font-semibold">0.12ms</span> (WAL mode)
+          </div>
+        </div>
+
+        <!-- Card 2: Zero-Loop CDC Triggers -->
+        <div class="glass-panel p-8 rounded-2xl flex flex-col justify-between transition duration-200">
+          <div>
+            <div class="w-10 h-10 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-slate-200 text-lg mb-6">
+              🔁
+            </div>
+            <div class="text-[10px] font-mono uppercase text-slate-400 font-semibold mb-2">Automated CDC</div>
+            <h3 class="text-xl font-bold text-white mb-2.5 tracking-tight">Zero-Loop CDC Triggers</h3>
+            <p class="text-slate-400 text-sm leading-relaxed mb-6 font-normal">
+              SQLite <code class="text-slate-200 font-mono">AFTER INSERT/UPDATE/DELETE</code> shadow triggers automatically journal mutations into <code class="text-slate-300 font-mono">_sync_changes</code> via <code class="text-slate-300 font-mono">json_object()</code>, shielded by a session-level recursion suppressor flag.
+            </p>
+          </div>
+          <div class="p-3 rounded-xl bg-black/40 border border-white/5 font-mono text-xs text-slate-400">
+            <span class="text-slate-300">guard:</span> (SELECT suppressed FROM _sync_suppress) = 0
+          </div>
+        </div>
+
+        <!-- Card 3: LWW Conflict Resolution -->
+        <div class="glass-panel p-8 rounded-2xl flex flex-col justify-between transition duration-200">
+          <div>
+            <div class="w-10 h-10 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-slate-200 text-lg mb-6">
+              🛡️
+            </div>
+            <div class="text-[10px] font-mono uppercase text-slate-400 font-semibold mb-2">Deterministic Consistency</div>
+            <h3 class="text-xl font-bold text-white mb-2.5 tracking-tight">LWW & Tombstones</h3>
+            <p class="text-slate-400 text-sm leading-relaxed mb-6 font-normal">
+              Deterministic Last-Write-Wins (LWW) utilizing microsecond timestamps. Dedicated <code class="text-slate-300 font-mono">_sync_tombstones</code> tracking ensures deleted records are never resurrected by out-of-order remote network packets.
+            </p>
+          </div>
+          <div class="p-3 rounded-xl bg-black/40 border border-white/5 font-mono text-xs text-slate-400">
+            <span class="text-slate-300">rule:</span> deleted_at &gt;= remote_ts → discard mutation
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. The DX (Developer Experience) Section -->
+  <section id="code" class="py-28 border-t border-white/[0.08] bg-[#030508]">
+    <div class="max-w-5xl mx-auto px-6">
+      
+      <div class="text-center mb-12">
+        <div class="text-xs font-mono font-medium uppercase tracking-widest text-slate-400 mb-2">Zero Rust Boilerplate Required</div>
+        <h2 class="text-3xl sm:text-5xl font-extrabold text-white tracking-[-0.03em]">Integrates in 3 lines of code.</h2>
+        <p class="text-slate-400 text-sm sm:text-base max-w-lg mx-auto mt-3">The TypeScript SDK provides a clean, reactive frontend interface while Rust handles heavy serialization and background workers.</p>
+      </div>
+
+      <!-- Syntax-Highlighted Dark Code Block -->
+      <div class="rounded-2xl border border-white/10 bg-[#06080d]/90 backdrop-blur-2xl shadow-glass overflow-hidden">
+        
+        <div class="px-5 py-3.5 bg-[#0a0d14] border-b border-white/[0.08] flex items-center justify-between text-xs font-mono">
+          <div class="flex items-center space-x-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-[#ff5f56]/90"></div>
+            <div class="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]/90"></div>
+            <div class="w-2.5 h-2.5 rounded-full bg-[#27c93f]/90"></div>
+            <span class="ml-3 text-slate-300 font-medium text-[11px]">src/main.ts</span>
+          </div>
+          <span class="text-slate-400 text-[11px]">TypeScript / Tauri v2</span>
+        </div>
+
+        <pre class="p-6 md:p-8 text-xs sm:text-sm font-mono text-slate-300 overflow-x-auto leading-relaxed"><code><span class="text-purple-400">import</span> { SyncManager } <span class="text-purple-400">from</span> <span class="text-emerald-300">'tauri-plugin-sync'</span>;
+
+<span class="text-slate-500">// 1. Initialize Sync with your local SQLite database</span>
+<span class="text-purple-400">const</span> sync = <span class="text-purple-400">await</span> SyncManager.init({
+  database: <span class="text-emerald-300">'app.db'</span>,
+  endpoint: <span class="text-emerald-300">'https://api.myapp.com/sync'</span>,
+  tables: [<span class="text-emerald-300">'todos'</span>, <span class="text-emerald-300">'categories'</span>, <span class="text-emerald-300">'notes'</span>],
+  authHeader: <span class="text-emerald-300">'Bearer eyJhbGciOi...'</span>,
+  syncIntervalMs: <span class="text-amber-300">5000</span>, <span class="text-slate-500">// automatic background polling</span>
+  batchSize: <span class="text-amber-300">500</span>,       <span class="text-slate-500">// bounded memory chunking</span>
+});
+
+<span class="text-slate-500">// 2. Reactive status listener for your UI state ('idle' | 'syncing' | 'offline' | 'error')</span>
+sync.onStatusChange((status) =&gt; {
+  console.log(<span class="text-emerald-300">'Real-time sync status:'</span>, status.state);
+});
+
+<span class="text-slate-500">// 3. Trigger manual sync or let background Tokio loop handle it</span>
+<span class="text-purple-400">await</span> sync.syncNow();</code></pre>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 5. Ecosystem Roadmap & Pro Adapters Section (Waitlist) -->
+  <section id="roadmap" class="py-28 border-t border-white/[0.08] bg-pitch">
+    <div class="max-w-4xl mx-auto px-6">
+      
+      <!-- Frosted dark container with refined 1px border and soft warm orb -->
+      <div class="p-10 sm:p-14 rounded-3xl glass-panel shadow-glass relative overflow-hidden">
+        
+        <!-- Subtle warm ambient corner glow -->
+        <div class="absolute -top-24 -right-24 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="max-w-2xl">
+          <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/10 text-[11px] font-mono text-slate-300 mb-6">
+            <span>ECOSYSTEM ROADMAP</span>
+          </div>
+
+          <h2 class="text-3xl sm:text-4xl font-extrabold text-white tracking-[-0.03em] mb-4">
+            Ecosystem Roadmap & Pro Adapters
+          </h2>
+
+          <p class="text-slate-400 text-sm sm:text-base leading-relaxed mb-8">
+            Working on turnkey adapters for <strong>Supabase</strong>, <strong>PostgreSQL RLS</strong>, and <strong>End-to-End Encryption (E2EE)</strong>. Drop-in migrations, ready-to-deploy edge functions, and zero server boilerplate.
+          </p>
+
+          <!-- Email Input Box Action with Vercel Styling -->
+          <form onsubmit="event.preventDefault(); const inp = this.querySelector('input'); if(inp.value){ alert('Thank you! You have been prioritized for Early Access.'); inp.value=''; }" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <input 
+              type="email" 
+              required
+              placeholder="Enter your work email (e.g., founder@startup.com)..." 
+              class="flex-1 px-4 py-3 rounded-xl bg-black/60 border border-white/10 text-white placeholder-slate-500 text-xs sm:text-sm focus:outline-none focus:border-white/30 transition font-sans backdrop-blur-xl"
+            />
+            <button 
+              type="submit" 
+              class="btn-vercel-primary px-6 py-3 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap"
+            >
+              Request Early Access
+            </button>
+          </form>
+
+          <p class="text-[11px] text-slate-500 mt-4">
+            No spam. You will only receive early access invitation and adapter SDK releases.
+          </p>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-white/[0.08] py-12 bg-black text-xs text-slate-500">
+    <div class="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        Designed & Architected by <a href="https://github.com/karan5028ji" class="text-slate-300 font-semibold hover:underline">Karan Gupta</a> • Founder @ <span class="text-slate-400">Gupta Ventures</span>
+      </div>
+      <div class="flex items-center space-x-6">
+        <a href="https://github.com/karan5028ji/tauri-plugin-sync" target="_blank" class="hover:text-slate-300 transition">GitHub</a>
+        <a href="#features" class="hover:text-slate-300 transition">Features</a>
+        <a href="#code" class="hover:text-slate-300 transition">Documentation</a>
+        <a href="#roadmap" class="hover:text-slate-300 transition">Pro Adapters</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Auto-play resilience script -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const video = document.getElementById('demo-video');
+      if (video) {
+        video.muted = true;
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            // Auto-play was prevented; retry on user scroll or touch
+            const startPlay = () => {
+              video.play();
+              window.removeEventListener('scroll', startPlay);
+              window.removeEventListener('touchstart', startPlay);
+              window.removeEventListener('click', startPlay);
+            };
+            window.addEventListener('scroll', startPlay, { once: true });
+            window.addEventListener('touchstart', startPlay, { once: true });
+            window.addEventListener('click', startPlay, { once: true });
+          });
+        }
+      }
+    });
+  </script>
+</body>
+</html>
