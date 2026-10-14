@@ -100,7 +100,17 @@ fn main() {
     .expect("Failed to initialize database tables");
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_sync::init())
+        .plugin(
+            tauri_plugin_sync::Builder::new()
+                .database(&db_path)
+                .endpoint("https://sync.example.com/api")
+                .bearer_token("demo-token-123")
+                .tables(vec!["todos".to_string()])
+                .sync_interval(std::time::Duration::from_secs(10))
+                .batch_size(50)
+                .prune_days(30)
+                .build(),
+        )
         .manage(AppState {
             db_path,
             conn: Mutex::new(conn),

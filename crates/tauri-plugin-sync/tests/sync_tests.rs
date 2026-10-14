@@ -12,7 +12,8 @@ mod tests {
 
     use tauri_plugin_sync::cdc::CdcManager;
     use tauri_plugin_sync::engine::SyncEngine;
-    use tauri_plugin_sync::models::{ChangeRecord, SyncConfig, SyncOperation};
+    use tauri_plugin_sync::models::{ChangeRecord, FrontendSyncConfig, SyncConfig, SyncOperation};
+    use tauri_plugin_sync::Builder;
 
     fn setup_test_db() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
@@ -618,5 +619,57 @@ mod tests {
 
         let watermark = CdcManager::get_watermark(&conn).unwrap();
         assert_eq!(watermark, 500);
+    }
+
+    #[tokio::test]
+    async fn test_pause_resume_and_frontend_config() {
+        let temp_db = NamedTempFile::new().unwrap();
+        let db_path = temp_db.path().to_str().unwrap().to_string();
+
+        let config = SyncConfig {
+            database: db_path.clone(),
+            endpoint: "https://example.com/sync".to_string(),
+            tables: vec![],
+            auth_header: None,
+            sync_interval_ms: 5000,
+            batch_size: 500,
+            prune_days: 30,
+        };
+
+        let conn = Connection::open(&db_path).unwrap();
+        let (engine, (_status_rx, _prog_rx, _unauth_rx)) = SyncEngine::new(conn, config).unwrap();
+
+        assert!(!engine.is_paused());
+        engine.pause();
+        assert!(engine.is_paused());
+        engine.resume();
+        assert!(!engine.is_paused());
+
+        // Update safe frontend configs
+        let frontend_cfg = FrontendSyncConfig {
+            sync_interval_ms: Some(2500),
+            batch_size: Some(100),
+            prune_days: Some(14),
+        };
+        engine.update_frontend_config(frontend_cfg).await.unwrap();
+
+        // Update auth header securely from Rust
+        engine.set_auth_header(Some("Bearer secret-rust-token".to_string())).await;
+    }
+
+    #[test]
+    fn test_builder_pattern_construction() {
+        let builder = Builder::new()
+            .database("test.db")
+            .endpoint("https://api.example.com/sync")
+            .bearer_token("my-secret-jwt")
+            .tables(vec!["todos".to_string(), "notes".to_string()])
+            .sync_interval(Duration::from_secs(15))
+            .batch_size(250)
+            .prune_days(60);
+
+        // Builder can be cloned and configured fluently
+        let cloned = builder.clone();
+        let _ = cloned;
     }
 }

@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use log::{error, info, warn};
@@ -10,8 +11,8 @@ use tokio::sync::{broadcast, Mutex, RwLock};
 use crate::cdc::CdcManager;
 use crate::error::{Error, Result};
 use crate::models::{
-    ChangeRecord, ClientChangeset, ServerChangeset, SyncConfig, SyncOperation, SyncProgressEvent,
-    SyncState, SyncStatus,
+    ChangeRecord, ClientChangeset, FrontendSyncConfig, ServerChangeset, SyncConfig, SyncOperation,
+    SyncProgressEvent, SyncState, SyncStatus,
 };
 
 pub struct SyncEngine {
@@ -23,6 +24,7 @@ pub struct SyncEngine {
     status_tx: broadcast::Sender<SyncStatus>,
     progress_tx: broadcast::Sender<SyncProgressEvent>,
     unauthorized_tx: broadcast::Sender<()>,
+    paused: Arc<AtomicBool>,
 }
 
 pub type SyncReceivers = (
@@ -71,6 +73,7 @@ impl SyncEngine {
             status_tx,
             progress_tx,
             unauthorized_tx,
+            paused: Arc::new(AtomicBool::new(false)),
         };
 
         Ok((engine, (status_rx, progress_rx, unauthorized_rx)))
@@ -86,6 +89,20 @@ impl SyncEngine {
 
     pub fn subscribe_unauthorized(&self) -> broadcast::Receiver<()> {
         self.unauthorized_tx.subscribe()
+    }
+
+    pub fn pause(&self) {
+        self.paused.store(true, Ordering::SeqCst);
+        info!("SyncEngine background polling paused");
+    }
+
+    pub fn resume(&self) {
+        self.paused.store(false, Ordering::SeqCst);
+        info!("SyncEngine background polling resumed");
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.paused.load(Ordering::SeqCst)
     }
 
     pub async fn get_status(&self) -> SyncStatus {
@@ -107,6 +124,25 @@ impl SyncEngine {
         let mut cfg = self.config.write().await;
         *cfg = new_config;
         Ok(())
+    }
+
+    pub async fn update_frontend_config(&self, frontend_cfg: FrontendSyncConfig) -> Result<()> {
+        let mut cfg = self.config.write().await;
+        if let Some(interval) = frontend_cfg.sync_interval_ms {
+            cfg.sync_interval_ms = interval;
+        }
+        if let Some(batch) = frontend_cfg.batch_size {
+            cfg.batch_size = batch;
+        }
+        if let Some(prune) = frontend_cfg.prune_days {
+            cfg.prune_days = prune;
+        }
+        Ok(())
+    }
+
+    pub async fn set_auth_header(&self, auth_header: Option<String>) {
+        let mut cfg = self.config.write().await;
+        cfg.auth_header = auth_header;
     }
 
     async fn set_state(&self, state: SyncState, last_error: Option<String>) {
@@ -532,6 +568,9 @@ impl SyncEngine {
                     break;
                 }
                 _ = tokio::time::sleep(if backoff > Duration::from_millis(1000) { backoff } else { interval_dur }) => {
+                    if self.is_paused() {
+                        continue;
+                    }
                     match self.sync_pass().await {
                         Ok(_) => {
                             // Reset backoff on success

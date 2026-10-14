@@ -39,12 +39,22 @@ tauri-plugin-sync = { git = "https://github.com/karan5028ji/tauri-plugin-sync", 
 ```
 
 ### 2. Initialize in Tauri Builder
-In your `src-tauri/src/lib.rs`:
+Configure database, endpoints, and credentials securely in `src-tauri/src/lib.rs` (or `main.rs`):
 
 ```rust
+use tauri_plugin_sync::Builder as SyncBuilder;
+
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_sync::init())
+        .plugin(
+            SyncBuilder::new()
+                .database("app.db")
+                .endpoint("https://api.example.com/sync")
+                .bearer_token("YOUR_AUTH_TOKEN") // Securely managed in Rust backend (XSS-safe)
+                .tables(vec!["notes".into(), "todos".into()])
+                .sync_interval(std::time::Duration::from_secs(5))
+                .build()
+        )
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -68,23 +78,17 @@ pnpm add "github:karan5028ji/tauri-plugin-sync#main"
 ## Quick Start
 
 ```typescript
-import { SyncManager } from 'tauri-plugin-sync';
+import { SyncManager, syncNow, getStatus } from 'tauri-plugin-sync';
 
-// Initialize sync on your SQLite database and specify tables to track
-const sync = await SyncManager.init({
-  database: 'app.db',
-  endpoint: 'https://api.example.com/sync',
-  tables: ['notes', 'todos'],
-  authHeader: 'Bearer YOUR_TOKEN',
-  syncIntervalMs: 5000,
-});
+// Zero-configuration: connects directly to the Rust-configured sync engine
+const sync = await SyncManager.init();
 
-// Listen to sync status
+// Listen to real-time sync status events
 sync.onStatusChange((status) => {
   console.log('Current status:', status); // 'idle' | 'syncing' | 'offline' | 'error'
 });
 
-// Force sync immediately
+// Trigger an immediate sync pass
 await sync.syncNow();
 ```
 

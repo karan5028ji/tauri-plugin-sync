@@ -1,17 +1,8 @@
-use tauri::{command, AppHandle, Runtime, State};
+use tauri::{command, State};
 
 use crate::error::Result;
-use crate::models::{SyncConfig, SyncProgressEvent, SyncStatus};
+use crate::models::{FrontendSyncConfig, SyncProgressEvent, SyncStatus};
 use crate::SyncPluginState;
-
-#[command]
-pub async fn init<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, SyncPluginState>,
-    config: SyncConfig,
-) -> Result<SyncStatus> {
-    state.init(app, config).await
-}
 
 #[command]
 pub async fn sync_now(
@@ -28,9 +19,23 @@ pub async fn get_status(
 }
 
 #[command]
+pub async fn pause(
+    state: State<'_, SyncPluginState>,
+) -> Result<()> {
+    state.pause().await
+}
+
+#[command]
+pub async fn resume(
+    state: State<'_, SyncPluginState>,
+) -> Result<()> {
+    state.resume().await
+}
+
+#[command]
 pub async fn configure(
     state: State<'_, SyncPluginState>,
-    config: SyncConfig,
+    config: FrontendSyncConfig,
 ) -> Result<()> {
-    state.configure(config).await
+    state.configure_frontend(config).await
 }

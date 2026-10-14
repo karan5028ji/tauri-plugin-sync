@@ -1,4 +1,4 @@
-const COMMANDS: &[&str] = &["init", "sync_now", "get_status", "configure"];
+const COMMANDS: &[&str] = &["sync_now", "get_status", "pause", "resume", "configure"];
 
 fn main() {
     tauri_plugin::Builder::new(COMMANDS)

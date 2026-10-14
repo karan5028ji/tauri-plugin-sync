@@ -16,140 +16,153 @@ export interface SyncProgressEvent {
   watermark: number;
 }
 
-export interface SyncConfig {
-  database: string;
-  endpoint: string;
-  tables: string[];
-  authHeader?: string;
-  getAuthHeader?: () => Promise<string> | string;
-  onTokenExpired?: () => Promise<string>;
+/**
+ * Safe frontend configuration tuning parameters.
+ * Sensitive parameters (credentials, database path, remote endpoints)
+ * are locked in Rust / tauri.conf.json to protect against WebView XSS vulnerabilities.
+ */
+export interface FrontendSyncConfig {
   syncIntervalMs?: number;
   batchSize?: number;
   pruneDays?: number;
 }
 
 /**
- * SyncManager provides the primary interface to tauri-plugin-sync.
+ * Triggers an immediate push/pull sync pass.
+ */
+export async function syncNow(): Promise<SyncProgressEvent> {
+  return await invoke<SyncProgressEvent>('plugin:sync|sync_now');
+}
+
+/**
+ * Returns current sync status (state, pending changes count, last sync timestamp).
+ */
+export async function getStatus(): Promise<SyncStatus> {
+  return await invoke<SyncStatus>('plugin:sync|get_status');
+}
+
+/**
+ * Pauses the background synchronization polling loop.
+ */
+export async function pause(): Promise<void> {
+  await invoke<void>('plugin:sync|pause');
+}
+
+/**
+ * Resumes the background synchronization polling loop.
+ */
+export async function resume(): Promise<void> {
+  await invoke<void>('plugin:sync|resume');
+}
+
+/**
+ * Updates safe frontend configuration options (e.g. sync interval, batch size).
+ */
+export async function configure(config: FrontendSyncConfig): Promise<void> {
+  await invoke<void>('plugin:sync|configure', {
+    config: {
+      sync_interval_ms: config.syncIntervalMs ?? null,
+      batch_size: config.batchSize ?? null,
+      prune_days: config.pruneDays ?? null,
+    },
+  });
+}
+
+/**
+ * Subscribes to sync state changes ('idle', 'syncing', 'offline', 'error').
+ */
+export async function onStatusChange(callback: (status: SyncStatus) => void): Promise<UnlistenFn> {
+  return await listen<SyncStatus>('sync://status', (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * Subscribes to sync progress events (number of pushed and pulled changesets).
+ */
+export async function onProgress(callback: (progress: SyncProgressEvent) => void): Promise<UnlistenFn> {
+  return await listen<SyncProgressEvent>('sync://progress', (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * Subscribes to 401 Unauthorized events from the sync engine.
+ */
+export async function onUnauthorized(callback: () => void): Promise<UnlistenFn> {
+  return await listen('sync://unauthorized', () => {
+    callback();
+  });
+}
+
+/**
+ * SyncManager provides the primary object-oriented interface to tauri-plugin-sync.
+ * Zero configuration is required on the frontend when configured via the Rust Builder.
  */
 export class SyncManager {
-  private config: SyncConfig;
+  private statusUnlisten: UnlistenFn | null = null;
+  private progressUnlisten: UnlistenFn | null = null;
   private unauthorizedUnlisten: UnlistenFn | null = null;
-  private isRefreshingToken = false;
-
-  private constructor(config: SyncConfig) {
-    this.config = config;
-  }
 
   /**
-   * Initializes SQLite shadow tables, triggers, and the background sync worker.
+   * Initializes or connects to the sync engine instance.
+   * Optionally updates safe frontend configurations.
    */
-  public static async init(config: SyncConfig): Promise<SyncManager> {
-    let initialAuthHeader = config.authHeader;
-    if (!initialAuthHeader && config.getAuthHeader) {
-      initialAuthHeader = await config.getAuthHeader();
+  public static async init(config?: FrontendSyncConfig): Promise<SyncManager> {
+    const manager = new SyncManager();
+    if (config) {
+      await manager.configure(config);
     }
-
-    await invoke<SyncStatus>('plugin:sync|init', {
-      config: {
-        database: config.database,
-        endpoint: config.endpoint,
-        tables: config.tables,
-        auth_header: initialAuthHeader ?? null,
-        sync_interval_ms: config.syncIntervalMs ?? 5000,
-        batch_size: config.batchSize ?? 500,
-        prune_days: config.pruneDays ?? 30,
-      },
-    });
-
-    const manager = new SyncManager(config);
-    await manager.setupUnauthorizedListener();
     return manager;
   }
 
-  private async setupUnauthorizedListener(): Promise<void> {
-    this.unauthorizedUnlisten = await listen('sync://unauthorized', async () => {
-      if (this.isRefreshingToken) return;
-
-      if (this.config.onTokenExpired) {
-        try {
-          this.isRefreshingToken = true;
-          const newToken = await this.config.onTokenExpired();
-          this.config.authHeader = newToken;
-          await this.configure({ ...this.config, authHeader: newToken });
-          // Automatically trigger an immediate retry pass with the refreshed token
-          await this.syncNow();
-        } catch (err) {
-          console.error('[tauri-plugin-sync] Token refresh callback failed:', err);
-        } finally {
-          this.isRefreshingToken = false;
-        }
-      }
-    });
-  }
-
-  /**
-   * Triggers an immediate push/pull sync pass.
-   */
   public async syncNow(): Promise<SyncProgressEvent> {
-    return await invoke<SyncProgressEvent>('plugin:sync|sync_now');
+    return await syncNow();
   }
 
-  /**
-   * Returns current sync status (state, pending changes count, last sync timestamp).
-   */
   public async getStatus(): Promise<SyncStatus> {
-    return await invoke<SyncStatus>('plugin:sync|get_status');
+    return await getStatus();
   }
 
-  /**
-   * Updates configuration dynamically (endpoint, auth token, tables, sync interval).
-   */
-  public async configure(config: SyncConfig): Promise<void> {
-    this.config = config;
-    await invoke<void>('plugin:sync|configure', {
-      config: {
-        database: config.database,
-        endpoint: config.endpoint,
-        tables: config.tables,
-        auth_header: config.authHeader ?? null,
-        sync_interval_ms: config.syncIntervalMs ?? 5000,
-        batch_size: config.batchSize ?? 500,
-        prune_days: config.pruneDays ?? 30,
-      },
-    });
+  public async pause(): Promise<void> {
+    await pause();
   }
 
-  /**
-   * Subscribes to sync state changes ('idle', 'syncing', 'offline', 'error').
-   */
+  public async resume(): Promise<void> {
+    await resume();
+  }
+
+  public async configure(config: FrontendSyncConfig): Promise<void> {
+    await configure(config);
+  }
+
   public async onStatusChange(callback: (status: SyncStatus) => void): Promise<UnlistenFn> {
-    return await listen<SyncStatus>('sync://status', (event) => {
-      callback(event.payload);
-    });
+    const unlisten = await onStatusChange(callback);
+    this.statusUnlisten = unlisten;
+    return unlisten;
   }
 
-  /**
-   * Subscribes to sync progress events (number of pushed and pulled changesets).
-   */
   public async onProgress(callback: (progress: SyncProgressEvent) => void): Promise<UnlistenFn> {
-    return await listen<SyncProgressEvent>('sync://progress', (event) => {
-      callback(event.payload);
-    });
+    const unlisten = await onProgress(callback);
+    this.progressUnlisten = unlisten;
+    return unlisten;
   }
 
-  /**
-   * Subscribes to 401 Unauthorized events.
-   */
   public async onUnauthorized(callback: () => void): Promise<UnlistenFn> {
-    return await listen('sync://unauthorized', () => {
-      callback();
-    });
+    const unlisten = await onUnauthorized(callback);
+    this.unauthorizedUnlisten = unlisten;
+    return unlisten;
   }
 
-  /**
-   * Cleans up event listeners.
-   */
   public destroy(): void {
+    if (this.statusUnlisten) {
+      this.statusUnlisten();
+      this.statusUnlisten = null;
+    }
+    if (this.progressUnlisten) {
+      this.progressUnlisten();
+      this.progressUnlisten = null;
+    }
     if (this.unauthorizedUnlisten) {
       this.unauthorizedUnlisten();
       this.unauthorizedUnlisten = null;

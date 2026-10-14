@@ -1,0 +1,13 @@
+# Default permissions for tauri-plugin-sync
+
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Default permissions for tauri-plugin-sync: allows querying sync status, triggering immediate sync, pausing/resuming background replication, and updating safe frontend configurations."
+permissions = [
+    "allow-sync-now",
+    "allow-get-status",
+    "allow-pause",
+    "allow-resume",
+    "allow-configure",
+]

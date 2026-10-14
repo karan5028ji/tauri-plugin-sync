@@ -86,6 +86,30 @@ pub struct SyncConfig {
     pub prune_days: u32,
 }
 
+/// Safe configuration parameters that can be updated from frontend JavaScript.
+/// Sensitive parameters (database path, auth header, remote endpoint) remain
+/// locked in the Rust backend to prevent XSS credential leaks or path traversal.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct FrontendSyncConfig {
+    pub sync_interval_ms: Option<u64>,
+    pub batch_size: Option<usize>,
+    pub prune_days: Option<u32>,
+}
+
+/// Static plugin configuration loaded from tauri.conf.json under `plugins.sync`
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PluginConfig {
+    pub database: Option<String>,
+    pub endpoint: Option<String>,
+    pub tables: Option<Vec<String>>,
+    pub auth_header: Option<String>,
+    pub sync_interval_ms: Option<u64>,
+    pub batch_size: Option<usize>,
+    pub prune_days: Option<u32>,
+}
+
 fn default_sync_interval_ms() -> u64 {
     5000
 }

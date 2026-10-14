@@ -149,21 +149,8 @@
 
     async function initPlugin() {
       try {
-        const dbPath = await invoke('get_db_path');
-        // Initialize tauri-plugin-sync on the database
-        await invoke('plugin:sync|init', {
-          config: {
-            database: dbPath,
-            endpoint: 'https://sync.example.com/api',
-            tables: ['todos'],
-            auth_header: 'Bearer demo-token-123',
-            sync_interval_ms: 10000,
-            batch_size: 50,
-            prune_days: 30
-          }
-        });
-
-        // Listen for live status events
+        // The sync engine is securely initialized in Rust via tauri_plugin_sync::Builder::new().
+        // Frontend Webview simply subscribes to live status and progress events.
         await listen('sync://status', (event) => {
           if (!isOffline) {
             updateStatusUI(event.payload.state);
@@ -174,7 +161,7 @@
           }
         });
       } catch (e) {
-        console.warn('Sync plugin init:', e);
+        console.warn('Sync plugin status listener:', e);
       }
     }
 

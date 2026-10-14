@@ -1,12 +1,13 @@
 ## Default Permission
 
-Default permissions for tauri-plugin-sync
+Default permissions for tauri-plugin-sync: allows querying sync status, triggering immediate sync, pausing/resuming background replication, and updating safe frontend configurations.
 
 #### This default permission set includes the following:
 
-- `allow-init`
 - `allow-sync-now`
 - `allow-get-status`
+- `allow-pause`
+- `allow-resume`
 - `allow-configure`
 
 ## Permission Table
@@ -73,12 +74,12 @@ Denies the get_status command without any pre-configured scope.
 <tr>
 <td>
 
-`sync:allow-init`
+`sync:allow-pause`
 
 </td>
 <td>
 
-Enables the init command without any pre-configured scope.
+Enables the pause command without any pre-configured scope.
 
 </td>
 </tr>
@@ -86,12 +87,38 @@ Enables the init command without any pre-configured scope.
 <tr>
 <td>
 
-`sync:deny-init`
+`sync:deny-pause`
 
 </td>
 <td>
 
-Denies the init command without any pre-configured scope.
+Denies the pause command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sync:allow-resume`
+
+</td>
+<td>
+
+Enables the resume command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sync:deny-resume`
+
+</td>
+<td>
+
+Denies the resume command without any pre-configured scope.
 
 </td>
 </tr>

@@ -319,16 +319,28 @@
           "markdownDescription": "Denies the get_status command without any pre-configured scope."
         },
         {
-          "description": "Enables the init command without any pre-configured scope.",
+          "description": "Enables the pause command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-init",
-          "markdownDescription": "Enables the init command without any pre-configured scope."
+          "const": "allow-pause",
+          "markdownDescription": "Enables the pause command without any pre-configured scope."
         },
         {
-          "description": "Denies the init command without any pre-configured scope.",
+          "description": "Denies the pause command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-init",
-          "markdownDescription": "Denies the init command without any pre-configured scope."
+          "const": "deny-pause",
+          "markdownDescription": "Denies the pause command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the resume command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-resume",
+          "markdownDescription": "Enables the resume command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the resume command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-resume",
+          "markdownDescription": "Denies the resume command without any pre-configured scope."
         },
         {
           "description": "Enables the sync_now command without any pre-configured scope.",
@@ -343,10 +355,10 @@
           "markdownDescription": "Denies the sync_now command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for tauri-plugin-sync\n#### This default permission set includes:\n\n- `allow-init`\n- `allow-sync-now`\n- `allow-get-status`\n- `allow-configure`",
+          "description": "Default permissions for tauri-plugin-sync: allows querying sync status, triggering immediate sync, pausing/resuming background replication, and updating safe frontend configurations.\n#### This default permission set includes:\n\n- `allow-sync-now`\n- `allow-get-status`\n- `allow-pause`\n- `allow-resume`\n- `allow-configure`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for tauri-plugin-sync\n#### This default permission set includes:\n\n- `allow-init`\n- `allow-sync-now`\n- `allow-get-status`\n- `allow-configure`"
+          "markdownDescription": "Default permissions for tauri-plugin-sync: allows querying sync status, triggering immediate sync, pausing/resuming background replication, and updating safe frontend configurations.\n#### This default permission set includes:\n\n- `allow-sync-now`\n- `allow-get-status`\n- `allow-pause`\n- `allow-resume`\n- `allow-configure`"
         }
       ]
     }
